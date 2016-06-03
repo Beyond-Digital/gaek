@@ -5,18 +5,18 @@ JSON encoder/decoder adapted for use with Google App Engine NDB.
 Usage:
 
   import ndb_json
-  
+
   # Serialize an ndb.Query into an array of JSON objects.
   query = models.MyModel.query()
   query_json = ndb_json.dumps(query)
-  
+
   # Convert into a list of Python dictionaries.
   query_dicts = ndb_json.loads(query_json)
-  
+
   # Serialize an ndb.Model instance into a JSON object.
   entity = query.get()
   entity_json = ndb_json.dumps(entity)
-  
+
   # Convert into a Python dictionary.
   entity_dict = ndb_json.loads(entity_json)
 
@@ -25,7 +25,7 @@ Dependencies:
 
   - dateutil: https://pypi.python.org/pypi/python-dateutil
 """
- 
+
 __author__ = 'Eric Higgins'
 __copyright__ = 'Copyright 2013, Eric Higgins'
 __email__ = 'erichiggins@gmail.com'
@@ -52,7 +52,7 @@ __all__ = (
 def encode_model(obj):
   """Encode objects like ndb.Model which have a `.to_dict()` method."""
   obj_dict = obj.to_dict()
-  for key, val in obj_dict.iteritems():
+  for key, val in obj_dict.items():
     if isinstance(val, types.StringType):
       try:
         unicode(val)
@@ -98,7 +98,7 @@ def encode_complex(obj):
 
 def encode_basevalue(obj):
   """Retrieve the actual value from a ndb.model._BaseValue.
-  
+
   This is a convenience function to assist with the following issue:
   https://code.google.com/p/appengine-ndb-experiment/issues/detail?id=208
   """
@@ -116,7 +116,7 @@ NDB_TYPE_ENCODING = {
   time.struct_time: encode_generator,
   types.ComplexType: encode_complex,
   ndb.model._BaseValue: encode_basevalue,
-  
+
 }
 
 
@@ -148,29 +148,23 @@ def dump(ndb_model, fp, **kwargs):
     fp.write(chunk)
 
 
-def loads(json_str, **kwargs):
-  """Custom json loads function that converts datetime strings."""
-  json_dict = json.loads(json_str, **kwargs)
-  if isinstance(json_dict, list):
-    return map(iteritems, json_dict)
-  return iteritems(json_dict)
+class NdbDecoder(json.JSONDecoder):
 
-
-def iteritems(json_dict):
-  """Loop over a json dict and try to convert strings to datetime."""
-  for key, val in json_dict.iteritems():
-    if isinstance(val, dict):
-      iteritems(val)
-    # TODO(erichiggins): Find a better way to detect date/time-like strings.
-    # Its a little hacky to check for specific chars, but avoids integers.
-    elif isinstance(val, basestring) and val.count('-') == 2 and len(val) > 9:
+  def decode(self, s):
+    sup = super(NdbDecoder, self).decode(s)
+    if isinstance(s, basestring) and s.count('-') == 2 and len(s) > 9:
       try:
-        json_dict[key] = dateutil.parser.parse(val)
+        dt = dateutil.parser.parse(val)
         # Check for UTC.
-        if val.endswith(('+00:00', '-00:00', 'Z')):
+        if s.endswith(('+00:00', '-00:00', 'Z')):
           # Then remove tzinfo for gae, which is offset-naive.
-          json_dict[key] = json_dict[key].replace(tzinfo=None)
+          dt = dt.replace(tzinfo=None)
+        return dt
       except (TypeError, ValueError):
         pass
-  return json_dict
-  
+    return sup
+
+
+def loads(json_str, **kwargs):
+  """Custom json loads function that converts datetime strings."""
+  return NdbDecoder(**kwargs).decode(json_str)
