@@ -100,6 +100,18 @@ class TestNdbJson(unittest.TestCase):
         assert '12-15' == parsed['non-date']
         assert '12-15-0' == parsed['double-hyphen non-date']
 
+    def test_loads_with_primitive_values(self):
+        test_cases = ['null', '2', 'Infinity', 'NaN', '1.2345']
+
+        for s in test_cases:
+            assert json.loads(s) == ndb_json.loads(s)
+
+    def test_loads_with_other_collections(self):
+        test_cases = ['[1,2,3,4]','[[0]]', '[[[{}]]]']
+
+        for s in test_cases:
+            assert json.loads(s) == ndb_json.loads(s)
+
 
 if __name__ == '__main__':
     unittest.main()
